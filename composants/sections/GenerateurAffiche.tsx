@@ -1,19 +1,46 @@
-"use client"; // Obligatoire car il y a de l'interactivité (on tape du texte)
+"use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import html2canvas from "html2canvas";
 
 export default function GenerateurAffiche() {
-  // Nos variables qui vont stocker le texte tapé par l'utilisateur
   const [titre, setTitre] = useState("Culte de Célébration");
   const [orateur, setOrateur] = useState("Pasteur Yvan");
   const [date, setDate] = useState("Dimanche 25 Avril • 09:30");
+  
+  // 1. Notre "viseur" pour l'appareil photo
+  const afficheRef = useRef<HTMLDivElement>(null);
+
+  // 2. La fonction magique de téléchargement
+  const telechargerVisuel = async () => {
+    if (!afficheRef.current) return;
+
+    try {
+      // On prend la "photo" de la zone ciblée
+      const canvas = await html2canvas(afficheRef.current, {
+        scale: 2, // Pour avoir une image en haute définition
+        backgroundColor: "#111111", // On force le fond sombre
+      });
+      
+      // On convertit la photo en fichier PNG
+      const image = canvas.toDataURL("image/png");
+      
+      // On simule un clic sur un lien de téléchargement
+      const lien = document.createElement("a");
+      lien.href = image;
+      lien.download = `ChurchHub-${titre.replace(/\s+/g, '-')}.png`; // Nom du fichier propre
+      lien.click();
+    } catch (erreur) {
+      console.error("Erreur lors de la capture :", erreur);
+      alert("Oups, impossible de générer l'image.");
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto py-12 px-6">
-      
       <div className="grid md:grid-cols-2 gap-12 items-start">
         
-        {/* LA COLONNE DE GAUCHE : LE FORMULAIRE */}
+        {/* COLONNE GAUCHE : FORMULAIRE */}
         <div className="bg-sombre/50 p-8 rounded-2xl border border-clair/10">
           <h2 className="text-2xl font-bold mb-6">Paramètres du visuel</h2>
           
@@ -48,22 +75,27 @@ export default function GenerateurAffiche() {
               />
             </div>
 
-            <button className="w-full mt-4 bg-or text-sombre font-bold py-3 rounded-lg hover:bg-or/90 transition-colors">
-              Télécharger l'Affiche (Bientôt)
+            {/* Le bouton déclenche maintenant la fonction au clic */}
+            <button 
+              onClick={telechargerVisuel}
+              className="w-full mt-4 bg-or text-sombre font-bold py-3 rounded-lg hover:bg-or/90 transition-colors"
+            >
+              Télécharger mon Affiche HD
             </button>
           </div>
         </div>
 
-        {/* LA COLONNE DE DROITE : L'APERÇU EN DIRECT */}
+        {/* COLONNE DROITE : APERÇU EN DIRECT */}
         <div className="flex justify-center">
-          {/* La zone de l'affiche (Format carré pour Facebook/Instagram) */}
-          <div className="w-full max-w-md aspect-square bg-[#111] relative overflow-hidden rounded-xl border-4 border-sombre shadow-2xl flex flex-col justify-center items-center text-center p-8">
-            
-            {/* Décoration dorée en arrière-plan */}
+          
+          {/* On attache notre "viseur" (ref={afficheRef}) à cette zone précise */}
+          <div 
+            ref={afficheRef} 
+            className="w-full max-w-md aspect-square bg-[#111] relative overflow-hidden rounded-xl border-4 border-sombre shadow-2xl flex flex-col justify-center items-center text-center p-8"
+          >
             <div className="absolute top-0 left-0 w-full h-2 bg-or"></div>
             <div className="absolute -top-20 -right-20 w-40 h-40 bg-or/10 rounded-full blur-3xl"></div>
             
-            {/* Les textes générés en direct */}
             <h4 className="text-or font-bold tracking-widest text-sm uppercase mb-4">
               ChurchHub Présente
             </h4>
