@@ -1,152 +1,177 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
-import GenerateurAffiche from "../../composants/sections/GenerateurAffiche";
-import StatsEglise from "../../composants/sections/StatsEglise";
 
 export default function Dashboard() {
   const [utilisateur, setUtilisateur] = useState<any>(null);
-  const [modeles, setModeles] = useState<any[]>([]);
-  const [modeleClique, setModeleClique] = useState<any>(null);
+  
+  // LE VIDEUR : Chargement strict par défaut
+  const [chargementInitial, setChargementInitial] = useState(true);
+  
+  // États pour la création d'événement
+  const [titreEvenement, setTitreEvenement] = useState("");
+  const [dateEvenement, setDateEvenement] = useState("");
+  const [chargementAction, setChargementAction] = useState(false);
+
   const router = useRouter();
 
   useEffect(() => {
-    const verifierAcces = async () => {
+    const verifierIdentite = async () => {
+      // On demande à Supabase si quelqu'un est connecté
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
+        // Pas de session = Expulsion vers la connexion
         router.push("/connexion");
       } else {
+        // Session valide = On laisse entrer
         setUtilisateur(session.user);
-        chargerModeles(session.user.id);
+        setChargementInitial(false);
       }
     };
-    verifierAcces();
+    
+    verifierIdentite();
   }, [router]);
-
-  const chargerModeles = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('modeles_affiches')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (!error && data) setModeles(data);
-  };
-
-  const supprimerModele = async (id: number) => {
-    if (!confirm("Voulez-vous vraiment supprimer ce modèle ?")) return;
-    const { error } = await supabase.from('modeles_affiches').delete().eq('id', id);
-    if (!error) setModeles(modeles.filter(m => m.id !== id));
-  };
 
   const seDeconnecter = async () => {
     await supabase.auth.signOut();
-    router.push("/");
+    router.push("/connexion");
   };
 
-  if (!utilisateur) {
+  const creerEvenement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChargementAction(true);
+    
+    // Simulation d'une sauvegarde dans la base de données
+    setTimeout(() => {
+      alert(`✅ L'événement "${titreEvenement}" a été programmé pour le ${dateEvenement} !`);
+      setTitreEvenement("");
+      setDateEvenement("");
+      setChargementAction(false);
+    }, 1000);
+  };
+
+  // ÉCRAN DE SÉCURITÉ : Tant qu'on vérifie l'identité, on ne montre rien du Dashboard
+  if (chargementInitial) {
     return (
-      <div className="min-h-screen bg-sombre text-clair flex justify-center items-center">
-        <div className="animate-pulse text-or font-bold tracking-widest uppercase">Ouverture du coffre-fort...</div>
+      <div className="min-h-screen bg-sombre flex flex-col items-center justify-center">
+        <div className="w-16 h-16 border-4 border-or border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-or mt-6 font-bold tracking-widest uppercase text-sm animate-pulse">Vérification des accès sécurisés...</p>
       </div>
     );
   }
 
+  // AFFICHAGE DU DASHBOARD (Uniquement pour les connectés)
   return (
     <div className="min-h-screen bg-sombre text-clair pt-24 px-6 pb-20">
-      {/* J'ai utilisé space-y-12 pour créer un bel espacement uniforme entre toutes les sections */}
-      <div className="max-w-7xl mx-auto space-y-12">
+      <div className="max-w-6xl mx-auto">
         
-        {/* 1. EN-TÊTE PRINCIPAL (Toujours en haut !) */}
-        <div className="flex flex-col md:flex-row justify-between items-center bg-sombre/80 p-6 rounded-2xl border border-clair/10 shadow-lg">
+        {/* EN-TÊTE DU DASHBOARD */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6 border-b border-clair/10 pb-8">
           <div>
-            <h1 className="text-3xl font-bold">Espace <span className="text-or">Ministère</span></h1>
-            <p className="text-clair/60 text-sm mt-1">Connecté en tant que : {utilisateur.email}</p>
+            <p className="text-clair/60 uppercase tracking-widest text-sm font-bold mb-1">Tableau de bord</p>
+            <h1 className="text-4xl font-black">
+              Bienvenue, <span className="text-or">{utilisateur?.user_metadata?.full_name || 'Leader'}</span> 👋
+            </h1>
+            <p className="text-clair/50 mt-2 text-sm">{utilisateur?.email}</p>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 md:mt-0">
-            <Link href="/offrandes" className="bg-green-500 text-sombre px-5 py-2 rounded-lg text-sm font-bold hover:bg-green-400 transition-all text-center shadow-md shadow-green-500/20">
-              📊 Finances
-            </Link>
-            <Link href="/membres" className="bg-or text-sombre px-5 py-2 rounded-lg text-sm font-bold hover:bg-or/90 transition-all text-center shadow-md shadow-or/20">
-              👥 Membres
-            </Link>
-            <Link href="/studio" className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-blue-500 transition-all text-center shadow-md shadow-blue-600/20">
-              🚀 Studio IA
-            </Link>
-            <Link href="/communication" className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-purple-500 transition-all text-center shadow-md shadow-purple-600/20">
-              💌 Communication
-            </Link>
-            <button onClick={seDeconnecter} className="border border-red-500/50 text-red-400 px-5 py-2 rounded-lg text-sm font-bold hover:bg-red-500 hover:text-white transition-all">
-              Se déconnecter
-            </button>
-          </div>
+          <button 
+            onClick={seDeconnecter}
+            className="border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-all"
+          >
+            Se déconnecter
+          </button>
         </div>
 
-        {/* 2. STATISTIQUES (La vue d'ensemble) */}
-        <div>
-          <StatsEglise />
-        </div>
-
-        {/* 3. GÉNÉRATEUR (L'outil principal) */}
-        <div>
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-            <span className="text-or">🎨</span> Création de Visuels
-          </h2>
-          <div className="bg-[#111] rounded-3xl overflow-hidden border border-clair/5 shadow-2xl">
-            <GenerateurAffiche modeleACharger={modeleClique} />
-          </div>
-        </div>
-
-        {/* 4. HISTORIQUE DES MODÈLES (Les archives) */}
-        <div>
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 border-b border-clair/10 pb-4">
-            <span className="text-or">💾</span> Vos Modèles Sauvegardés
-          </h2>
+        <div className="grid lg:grid-cols-3 gap-8">
           
-          {modeles.length === 0 ? (
-            <p className="text-clair/50 text-center py-10 bg-sombre/50 rounded-xl border border-clair/5">
-              Aucun modèle sauvegardé.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {modeles.map((modele) => (
-                <div key={modele.id} className="bg-sombre/80 p-6 rounded-xl border border-clair/10 hover:border-or/50 transition-colors relative group">
-                  <button 
-                    onClick={() => supprimerModele(modele.id)}
-                    className="absolute top-4 right-4 text-clair/20 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                    title="Supprimer ce modèle"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-or/20 to-or rounded-t-xl opacity-50"></div>
-                  
-                  <h3 className="text-xl font-bold mb-2 uppercase pr-8">{modele.titre}</h3>
-                  <p className="text-clair/70 mb-1">🎙️ <span className="text-or">{modele.orateur}</span></p>
-                  <p className="text-clair/70 text-sm">📅 {modele.date_culte}</p>
-                  
-                  <button 
-                    onClick={() => {
-                      setModeleClique(modele);
-                      // Fait défiler la page doucement vers le haut jusqu'au générateur
-                      window.scrollTo({ top: 300, behavior: 'smooth' });
-                    }}
-                    className="mt-5 w-full bg-or/10 text-or border border-or/20 font-bold py-2 rounded-lg hover:bg-or hover:text-sombre transition-colors text-sm"
-                  >
-                    Utiliser ce modèle
-                  </button>
-                </div>
-              ))}
+          {/* COLONNE PRINCIPALE : LES APPLICATIONS CHURCHHUB */}
+          <div className="lg:col-span-2 space-y-8">
+            <h2 className="text-2xl font-bold flex items-center gap-3">
+              <span>⚡</span> Accès Rapides
+            </h2>
+            
+            <div className="grid sm:grid-cols-2 gap-4">
+              
+              <Link href="/membres" className="bg-[#111] border border-clair/10 p-6 rounded-3xl hover:border-or/50 transition-all group shadow-lg">
+                <div className="w-12 h-12 bg-or/10 text-or rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">👥</div>
+                <h3 className="text-xl font-bold text-white mb-2">Membres & Cartes</h3>
+                <p className="text-sm text-clair/50">Gérez le répertoire et générez les cartes VIP de votre église.</p>
+              </Link>
+
+              <Link href="/studio" className="bg-[#111] border border-clair/10 p-6 rounded-3xl hover:border-blue-500/50 transition-all group shadow-lg">
+                <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">🚀</div>
+                <h3 className="text-xl font-bold text-white mb-2">Studio Social IA</h3>
+                <p className="text-sm text-clair/50">Générez des scripts viraux et utilisez le téléprompteur intégré.</p>
+              </Link>
+
+              <Link href="/communication" className="bg-[#111] border border-clair/10 p-6 rounded-3xl hover:border-purple-500/50 transition-all group shadow-lg">
+                <div className="w-12 h-12 bg-purple-500/10 text-purple-400 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">💌</div>
+                <h3 className="text-xl font-bold text-white mb-2">Communication</h3>
+                <p className="text-sm text-clair/50">Envoyez des e-mails ou des SMS groupés à vos membres.</p>
+              </Link>
+
+              <Link href="/scanner" className="bg-[#111] border border-clair/10 p-6 rounded-3xl hover:border-green-500/50 transition-all group shadow-lg">
+                <div className="w-12 h-12 bg-green-500/10 text-green-400 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">📷</div>
+                <h3 className="text-xl font-bold text-white mb-2">Poste d'Accueil</h3>
+                <p className="text-sm text-clair/50">Scannez les QR Codes à l'entrée pour valider les présences.</p>
+              </Link>
+
+              {/* NOUVELLE CARTE : FINANCES & OFFRANDES */}
+              <Link href="/offrandes" className="bg-[#111] border border-clair/10 p-6 rounded-3xl hover:border-emerald-500/50 transition-all group shadow-lg sm:col-span-2 lg:col-span-1">
+                <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">💰</div>
+                <h3 className="text-xl font-bold text-white mb-2">Finances & Offrandes</h3>
+                <p className="text-sm text-clair/50">Gérez les dîmes, les dons et suivez la santé financière de l'église.</p>
+              </Link>
+
             </div>
-          )}
-        </div>
+          </div>
 
+          {/* COLONNE DROITE : ACTIONS SECONDAIRES (Ex: Événements) */}
+          <div className="lg:col-span-1 space-y-8">
+            <h2 className="text-2xl font-bold flex items-center gap-3">
+              <span>📅</span> Planification
+            </h2>
+
+            <div className="bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] border border-or/20 p-8 rounded-3xl shadow-2xl relative overflow-hidden">
+              {/* Effet lumineux de fond */}
+              <div className="absolute -top-20 -right-20 w-40 h-40 bg-or/10 blur-[50px] rounded-full"></div>
+
+              <h3 className="text-lg font-bold text-white mb-6">Créer un nouvel événement</h3>
+              
+              <form onSubmit={creerEvenement} className="space-y-4 relative z-10">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-clair/50 mb-2">Titre de l'événement</label>
+                  <input 
+                    type="text" required value={titreEvenement} onChange={(e) => setTitreEvenement(e.target.value)}
+                    placeholder="Ex: Culte de résurrection..."
+                    className="w-full bg-black/50 border border-clair/20 rounded-xl px-4 py-3 text-sm text-clair focus:border-or outline-none transition-colors"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-clair/50 mb-2">Date prévue</label>
+                  <input 
+                    type="date" required value={dateEvenement} onChange={(e) => setDateEvenement(e.target.value)}
+                    className="w-full bg-black/50 border border-clair/20 rounded-xl px-4 py-3 text-sm text-clair focus:border-or outline-none transition-colors [color-scheme:dark]"
+                  />
+                </div>
+
+                <button 
+                  type="submit" disabled={chargementAction}
+                  className="w-full bg-or text-sombre font-black py-3.5 rounded-xl text-sm hover:scale-[1.02] transition-transform disabled:opacity-50 mt-2 shadow-lg shadow-or/20"
+                >
+                  {chargementAction ? "Création en cours..." : "+ Ajouter au calendrier"}
+                </button>
+              </form>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );
