@@ -109,6 +109,18 @@ export default function Dashboard() {
                 <p className="text-sm text-clair/50">Générez des scripts viraux et utilisez le téléprompteur intégré.</p>
               </Link>
 
+              <Link href="/statistiques" className="bg-[#111] border border-clair/10 p-6 rounded-3xl hover:border-blue-500/50 transition-all group shadow-lg sm:col-span-2 lg:col-span-1">
+                <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">📈</div>
+                <h3 className="text-xl font-bold text-white mb-2">Analytics & Présences</h3>
+                <p className="text-sm text-clair/50">Analysez la croissance de l'église et repérez les membres absents.</p>
+              </Link>
+
+              <Link href="/planning" className="bg-[#111] border border-clair/10 p-6 rounded-3xl hover:border-purple-500/50 transition-all group shadow-lg sm:col-span-2 lg:col-span-1">
+                <div className="w-12 h-12 bg-purple-500/10 text-purple-400 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">📅</div>
+                <h3 className="text-xl font-bold text-white mb-2">Planning & Services</h3>
+                <p className="text-sm text-clair/50">Organisez les équipes (louange, accueil...) pour vos prochains cultes.</p>
+              </Link>
+              
               <Link href="/communication" className="bg-[#111] border border-clair/10 p-6 rounded-3xl hover:border-purple-500/50 transition-all group shadow-lg">
                 <div className="w-12 h-12 bg-purple-500/10 text-purple-400 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">💌</div>
                 <h3 className="text-xl font-bold text-white mb-2">Communication</h3>
