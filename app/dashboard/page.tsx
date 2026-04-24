@@ -132,7 +132,17 @@ export default function Dashboard() {
                 <h3 className="text-xl font-bold text-white mb-2">Poste d'Accueil</h3>
                 <p className="text-sm text-clair/50">Scannez les QR Codes à l'entrée pour valider les présences.</p>
               </Link>
-
+              <Link href="/supervision" className="bg-gradient-to-br from-[#111] to-black border border-or/30 p-6 rounded-3xl hover:border-or hover:scale-105 transition-all group shadow-[0_10px_30px_rgba(255,215,0,0.1)] sm:col-span-2 lg:col-span-1 flex flex-col items-center text-center justify-center relative overflow-hidden">
+                {/* Petit point rouge clignotant "Live" dans le coin */}
+                <div className="absolute top-6 right-6 flex items-center gap-2">
+                  <span className="text-[9px] uppercase font-black tracking-widest text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">Live</span>
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+                </div>
+                
+                <div className="w-16 h-16 bg-or/10 text-or rounded-full flex items-center justify-center text-3xl mb-4 group-hover:bg-or group-hover:text-sombre transition-colors">📡</div>
+                <h3 className="text-xl font-black text-white mb-2">Tour de Contrôle</h3>
+                <p className="text-sm text-clair/50">Suivez les entrées et les présences en temps réel (Live).</p>
+              </Link>
               {/* NOUVELLE CARTE : FINANCES & OFFRANDES */}
               <Link href="/offrandes" className="bg-[#111] border border-clair/10 p-6 rounded-3xl hover:border-emerald-500/50 transition-all group shadow-lg sm:col-span-2 lg:col-span-1">
                 <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">💰</div>
