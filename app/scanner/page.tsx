@@ -25,34 +25,33 @@ export default function ScannerEntree() {
     verifierAcces();
   }, [router]);
 
-  // 🔊 Fonction magique pour générer un "Bip" de scanner en pur code !
-  const emettreSon = (type: 'succes' | 'erreur') => {
+  // 🔊 Générateur de son
+  const emettreSon = (type: 'succes' | 'erreur' | 'sortie') => {
     try {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContext) return;
-      
       const ctx = new AudioContext();
       const osc = ctx.createOscillator();
       const gainNode = ctx.createGain();
-      
       osc.connect(gainNode);
       gainNode.connect(ctx.destination);
       
       if (type === 'succes') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, ctx.currentTime);
+        osc.type = 'sine'; osc.frequency.setValueAtTime(800, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
-        gainNode.gain.setValueAtTime(0.5, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.5, ctx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
         osc.start(); osc.stop(ctx.currentTime + 0.1);
+      } else if (type === 'sortie') {
+        osc.type = 'triangle'; osc.frequency.setValueAtTime(600, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.15);
+        gainNode.gain.setValueAtTime(0.4, ctx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+        osc.start(); osc.stop(ctx.currentTime + 0.15);
       } else {
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(300, ctx.currentTime);
-        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        osc.type = 'square'; osc.frequency.setValueAtTime(300, ctx.currentTime);
+        gainNode.gain.setValueAtTime(0.3, ctx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
         osc.start(); osc.stop(ctx.currentTime + 0.3);
       }
-    } catch (e) { console.log("Son non supporté sur ce navigateur"); }
+    } catch (e) {}
   };
 
   useEffect(() => {
@@ -61,7 +60,7 @@ export default function ScannerEntree() {
       
       const scanner = new Html5QrcodeScanner(
         "lecteur-qr",
-        { fps: 15, qrbox: { width: 280, height: 280 } }, // Plus rapide et boîte plus grande
+        { fps: 15, qrbox: { width: 280, height: 280 } },
         false
       );
 
@@ -70,52 +69,73 @@ export default function ScannerEntree() {
           scanner.pause();
           
           try {
-            const { data: membre, error } = await supabase
+            // 1. On cherche le membre scanné
+            const { data: membre } = await supabase
               .from('membres')
               .select('*')
               .eq('id', texteDecode)
               .single();
 
             if (membre) {
-              
-              // VÉRIFICATION ANNIVERSAIRE 🎂
+              // Vérification anniversaire
               let estAnniversaire = false;
               if (membre.date_naissance) {
-                const dateNaissance = new Date(membre.date_naissance);
-                const aujourdHuiDate = new Date();
-                if (dateNaissance.getDate() === aujourdHuiDate.getDate() && dateNaissance.getMonth() === aujourdHuiDate.getMonth()) {
-                  estAnniversaire = true;
-                }
+                const dn = new Date(membre.date_naissance); const auj = new Date();
+                if (dn.getDate() === auj.getDate() && dn.getMonth() === auj.getMonth()) estAnniversaire = true;
               }
 
-              validerEntree(membre, estAnniversaire);
-              
+              // 2. On vérifie la présence du jour
               const aujourdHui = new Date().toISOString().split('T')[0];
-              const { data: dejaPresent } = await supabase
+              const { data: presenceAujourdhui } = await supabase
                 .from('presences')
-                .select('id')
+                .select('*')
                 .eq('membre_nom', membre.nom)
                 .eq('date_presence', aujourdHui)
                 .single();
 
-              if (!dejaPresent) {
+              if (!presenceAujourdhui) {
+                // CAS A : PREMIER POINTAGE = ENTRÉE (Pour tout le monde)
                 await supabase.from('presences').insert([{
                   user_id: utilisateur.id,
                   membre_nom: membre.nom,
                   date_presence: aujourdHui,
                   scanne_par: utilisateur.email
                 }]);
+                validerAction(membre, 'entree', estAnniversaire);
+              } 
+              else {
+                // CAS B : DÉJÀ POINTÉ
+                if (membre.est_ouvrier) {
+                  // C'EST UN OUVRIER/BÉNÉVOLE !
+                  if (!presenceAujourdhui.heure_sortie) {
+                    // Il n'est pas encore sorti = POINTAGE DE SORTIE
+                    await supabase.from('presences').update({
+                      heure_sortie: new Date().toISOString()
+                    }).eq('id', presenceAujourdhui.id);
+                    validerAction(membre, 'sortie', estAnniversaire);
+                  } else {
+                    // Il est déjà entré ET sorti.
+                    emettreSon('erreur');
+                    setAlerte("Service déjà terminé aujourd'hui.");
+                    setTimeout(() => setAlerte(null), 3000);
+                  }
+                } else {
+                  // C'EST UN FIDÈLE CLASSIQUE : On bloque le double scan
+                  emettreSon('erreur');
+                  setAlerte("Présence déjà enregistrée à l'accueil.");
+                  setTimeout(() => setAlerte(null), 3000);
+                }
               }
 
             } else {
               emettreSon('erreur');
-              if (navigator.vibrate) navigator.vibrate([300, 100, 300]); // Vibration lourde d'erreur
+              if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
               setAlerte("Carte VIP non reconnue.");
               setTimeout(() => setAlerte(null), 3000);
             }
           } catch (e) {
             emettreSon('erreur');
-            setAlerte("Erreur de lecture.");
+            setAlerte("Erreur de lecture du code.");
             setTimeout(() => setAlerte(null), 3000);
           }
 
@@ -124,37 +144,33 @@ export default function ScannerEntree() {
         (erreur) => {}
       );
 
-      return () => {
-        scanner.clear().catch(error => console.error("Erreur nettoyage", error));
-      };
+      return () => { scanner.clear().catch(e => console.error(e)); };
     }
   }, [utilisateur]);
 
-  const validerEntree = (membre: any, estAnniversaire: boolean) => {
-    // 📳 + 🔊 Feedback Sensoriel
-    emettreSon('succes');
-    if (navigator.vibrate) navigator.vibrate([50, 50, 50]); // Triple petite vibration Premium
+  const validerAction = (membre: any, action: 'entree' | 'sortie', estAnniversaire: boolean) => {
     
-    // 🎉 Confettis Dorés
-    confetti({
-      particleCount: 150,
-      spread: 80,
-      origin: { y: 0.6 },
-      colors: ['#D4AF37', '#FFFFFF', '#000000']
-    });
+    // Feedback sensoriel différent selon l'entrée ou la sortie
+    if (action === 'entree') {
+      emettreSon('succes');
+      if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#D4AF37', '#FFFFFF'] });
+    } else {
+      emettreSon('sortie');
+      if (navigator.vibrate) navigator.vibrate([100]);
+    }
 
-    setDernierScan({ ...membre, estAnniversaire });
+    setDernierScan({ ...membre, estAnniversaire, action });
     
     const nouvelleEntree = { 
       ...membre, 
       heure: new Date().toLocaleTimeString('fr-FR'), 
       id_scan: Date.now(),
-      estAnniversaire 
+      estAnniversaire,
+      action
     };
     
     setHistorique(prev => [nouvelleEntree, ...prev]);
-
-    // L'écran vert dure un tout petit peu plus longtemps si c'est un anniversaire
     setTimeout(() => setDernierScan(null), estAnniversaire ? 3500 : 2000);
   };
 
@@ -163,21 +179,22 @@ export default function ScannerEntree() {
   return (
     <div className="min-h-screen bg-sombre text-clair pt-24 px-6 pb-20 relative">
       
-      {/* ÉCRAN DE SUCCÈS GÉANT DYNAMIQUE */}
+      {/* ÉCRAN GÉANT (Vert pour l'entrée, Bleu pour la sortie) */}
       {dernierScan && (
-        <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center animate-in zoom-in duration-200 ${dernierScan.estAnniversaire ? 'bg-gradient-to-br from-purple-600 to-indigo-900' : 'bg-emerald-500'}`}>
+        <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center animate-in zoom-in duration-200 ${
+          dernierScan.estAnniversaire ? 'bg-gradient-to-br from-purple-600 to-indigo-900' : 
+          dernierScan.action === 'sortie' ? 'bg-blue-600' : 'bg-emerald-500'
+        }`}>
           
           <div className="relative">
             {dernierScan.photo_url ? (
               <img src={dernierScan.photo_url} alt={dernierScan.nom} className={`w-48 h-48 rounded-full object-cover border-8 mb-8 shadow-2xl ${dernierScan.estAnniversaire ? 'border-or' : 'border-white'}`} />
             ) : (
-              <div className={`w-40 h-40 bg-white rounded-full flex items-center justify-center text-8xl mb-8 shadow-2xl ${dernierScan.estAnniversaire ? 'border-4 border-or' : ''}`}>✅</div>
+              <div className="w-40 h-40 bg-white rounded-full flex items-center justify-center text-8xl mb-8 shadow-2xl">
+                {dernierScan.action === 'sortie' ? '👋' : '✅'}
+              </div>
             )}
-            
-            {/* Couronne si anniversaire */}
-            {dernierScan.estAnniversaire && (
-              <div className="absolute -top-8 -right-4 text-6xl animate-bounce">👑</div>
-            )}
+            {dernierScan.estAnniversaire && <div className="absolute -top-8 -right-4 text-6xl animate-bounce">👑</div>}
           </div>
 
           <h1 className="text-6xl font-black text-white uppercase tracking-widest text-center px-4 leading-tight">
@@ -187,12 +204,12 @@ export default function ScannerEntree() {
           {dernierScan.estAnniversaire ? (
             <div className="mt-6 flex flex-col items-center animate-pulse">
               <p className="text-4xl font-black text-or uppercase tracking-widest text-center">JOYEUX ANNIVERSAIRE ! 🎂</p>
-              <p className="text-white/80 font-bold mt-2">Souhaitez-lui une bonne fête !</p>
             </div>
+          ) : dernierScan.action === 'sortie' ? (
+            <p className="text-3xl font-bold text-blue-900 mt-4 bg-white/20 px-8 py-2 rounded-full shadow-lg">👋 FIN DE SERVICE ENREGISTRÉE</p>
           ) : (
-            <p className="text-3xl font-bold text-emerald-900 mt-4 bg-white/20 px-8 py-2 rounded-full">⭐ ACCÈS VIP VALIDÉ</p>
+            <p className="text-3xl font-bold text-emerald-900 mt-4 bg-white/20 px-8 py-2 rounded-full shadow-lg">⭐ ACCÈS VIP VALIDÉ</p>
           )}
-
         </div>
       )}
 
@@ -203,7 +220,7 @@ export default function ScannerEntree() {
             <h1 className="text-3xl font-bold">Scanner <span className="text-or">Mobile</span> 📱</h1>
           </div>
           <div className="bg-[#111] border border-clair/10 px-6 py-3 rounded-xl font-bold text-lg shadow-lg flex items-center gap-3">
-            Scans session : <span className="text-or text-2xl font-black">{historique.length}</span>
+            Flux local : <span className="text-or text-2xl font-black">{historique.length}</span>
           </div>
         </div>
 
@@ -212,15 +229,11 @@ export default function ScannerEntree() {
           {/* ZONE DE SCAN */}
           <div className="bg-[#111] p-6 rounded-3xl border border-clair/10 shadow-xl flex flex-col items-center">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
-              Caméra Active
+              <span className="w-2 h-2 bg-red-500 rounded-full animate-ping"></span> Caméra Active
             </h2>
-            <p className="text-sm text-clair/50 text-center mb-6">Le volume de l'appareil doit être activé pour le retour sonore.</p>
             
-            {/* Design amélioré de la caméra */}
             <div className="w-full bg-black rounded-3xl overflow-hidden border-4 border-or/20 relative shadow-[0_0_40px_rgba(255,215,0,0.1)]">
               <div id="lecteur-qr" className="w-full"></div>
-              {/* Mire de visée graphique */}
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-8">
                 <div className="w-full h-full border-2 border-or/40 border-dashed rounded-2xl"></div>
               </div>
@@ -230,65 +243,36 @@ export default function ScannerEntree() {
             
             <style jsx global>{`
               #lecteur-qr img { display: none !important; }
-              #lecteur-qr button { background: linear-gradient(to right, #D4AF37, #F3E5AB) !important; color: #000 !important; font-weight: 900 !important; border-radius: 12px !important; padding: 14px 24px !important; border: none !important; margin-top: 20px !important; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3); text-transform: uppercase; letter-spacing: 1px;}
-              #lecteur-qr button:hover { transform: scale(1.02); box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5); }
+              #lecteur-qr button { background: linear-gradient(to right, #D4AF37, #F3E5AB) !important; color: #000 !important; font-weight: 900 !important; border-radius: 12px !important; padding: 14px 24px !important; border: none !important; margin-top: 20px !important; cursor: pointer; transition: transform 0.2s; text-transform: uppercase; letter-spacing: 1px;}
               #lecteur-qr span { color: #fff !important; }
               #lecteur-qr select { background: #1a1a1a !important; color: #fff !important; border: 1px solid #333 !important; border-radius: 12px; padding: 12px; margin-bottom: 10px; width: 100%; font-weight: bold;}
-              
-              /* =========================================
-                 TRADUCTION FORCÉE (ANGLAIS -> FRANÇAIS)
-                 ========================================= */
-                 
-              /* 1. On masque le texte original en anglais (taille 0) */
-              #html5-qrcode-button-camera-permission,
-              #html5-qrcode-button-camera-start,
-              #html5-qrcode-button-camera-stop {
-                font-size: 0 !important; 
-              }
-              
-              /* 2. On injecte nos textes en français ! */
-              #html5-qrcode-button-camera-permission::after {
-                content: "📸 AUTORISER LA CAMÉRA";
-                font-size: 14px !important;
-              }
-              
-              #html5-qrcode-button-camera-start::after {
-                content: "▶️ DÉMARRER LE SCANNER";
-                font-size: 14px !important;
-              }
-              
-              #html5-qrcode-button-camera-stop::after {
-                content: "⏹️ ARRÊTER LA CAMÉRA";
-                font-size: 14px !important;
-              }
-
-              /* 3. On supprime le lien inutile "Scan an Image File" */
-              #html5-qrcode-anchor-scan-type-change {
-                display: none !important;
-              }
+              #html5-qrcode-button-camera-permission, #html5-qrcode-button-camera-start, #html5-qrcode-button-camera-stop { font-size: 0 !important; }
+              #html5-qrcode-button-camera-permission::after { content: "📸 AUTORISER LA CAMÉRA"; font-size: 14px !important; }
+              #html5-qrcode-button-camera-start::after { content: "▶️ DÉMARRER LE SCANNER"; font-size: 14px !important; }
+              #html5-qrcode-button-camera-stop::after { content: "⏹️ ARRÊTER LA CAMÉRA"; font-size: 14px !important; }
+              #html5-qrcode-anchor-scan-type-change { display: none !important; }
             `}</style>
           </div>
 
           {/* HISTORIQUE */}
           <div className="bg-[#111] p-6 rounded-3xl border border-clair/10 shadow-xl h-[600px] flex flex-col">
-            <h2 className="text-xl font-bold mb-6 border-b border-clair/5 pb-4">Historique des accès</h2>
+            <h2 className="text-xl font-bold mb-6 border-b border-clair/5 pb-4">Historique de la porte</h2>
             <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
               {historique.map((entree) => (
-                <div key={entree.id_scan} className={`p-4 rounded-2xl border flex justify-between items-center animate-in slide-in-from-left duration-300 ${entree.estAnniversaire ? 'bg-purple-900/20 border-purple-500/30' : 'bg-sombre/80 border-clair/5'}`}>
+                <div key={entree.id_scan} className="p-4 rounded-2xl border border-clair/5 bg-sombre/80 flex justify-between items-center animate-in slide-in-from-left duration-300">
                   <div className="flex items-center gap-4">
                     {entree.photo_url ? (
-                      <img src={entree.photo_url} alt="" className={`w-12 h-12 rounded-full object-cover border-2 ${entree.estAnniversaire ? 'border-purple-400' : 'border-or/30'}`} />
+                      <img src={entree.photo_url} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-or/30" />
                     ) : (
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl border-2 ${entree.estAnniversaire ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-or/10 text-or border-or/20'}`}>
-                        {entree.nom.charAt(0)}
-                      </div>
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl border-2 bg-or/10 text-or border-or/20">{entree.nom.charAt(0)}</div>
                     )}
                     <div>
                       <h3 className="font-bold text-lg text-white">{entree.nom}</h3>
-                      {entree.estAnniversaire ? (
-                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 inline-block border bg-purple-500/20 text-purple-400 border-purple-500/30">🎂 Anniversaire</span>
+                      {/* Affichage du Badge ENTRÉE ou SORTIE */}
+                      {entree.action === 'sortie' ? (
+                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 inline-block border bg-blue-500/20 text-blue-400 border-blue-500/30">Sortie Staff</span>
                       ) : (
-                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 inline-block border bg-or/10 text-or border-or/20">VIP Pass</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 inline-block border bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Entrée</span>
                       )}
                     </div>
                   </div>

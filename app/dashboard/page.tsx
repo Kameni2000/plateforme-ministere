@@ -143,6 +143,11 @@ export default function Dashboard() {
                 <h3 className="text-xl font-black text-white mb-2">Tour de Contrôle</h3>
                 <p className="text-sm text-clair/50">Suivez les entrées et les présences en temps réel (Live).</p>
               </Link>
+              <Link href="/academie" className="bg-gradient-to-br from-[#111] to-black border border-or/30 p-6 rounded-3xl hover:border-or hover:scale-105 transition-all group shadow-[0_10px_30px_rgba(255,215,0,0.1)] flex flex-col items-center text-center justify-center">
+                <div className="w-16 h-16 bg-or/10 text-or rounded-full flex items-center justify-center text-3xl mb-4 group-hover:bg-or group-hover:text-sombre transition-colors">🎓</div>
+                <h3 className="text-xl font-black text-white mb-2">Académie</h3>
+                <p className="text-sm text-clair/50">Suivi des formations, catéchèse et école du dimanche.</p>
+              </Link>
               {/* NOUVELLE CARTE : FINANCES & OFFRANDES */}
               <Link href="/offrandes" className="bg-[#111] border border-clair/10 p-6 rounded-3xl hover:border-emerald-500/50 transition-all group shadow-lg sm:col-span-2 lg:col-span-1">
                 <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">💰</div>
