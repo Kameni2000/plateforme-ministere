@@ -24,6 +24,8 @@ export default function Membres() {
   
   // États d'affichage
   const [membreSelectionne, setMembreSelectionne] = useState<any>(null);
+  const [afficherCarteVIP, setAfficherCarteVIP] = useState(false);
+  const [qrZoom, setQrZoom] = useState(false); // NOUVEAU : État pour le zoom du QR Code
   const [chargement, setChargement] = useState(false);
   const [modeEdition, setModeEdition] = useState(false);
 
@@ -51,7 +53,6 @@ export default function Membres() {
     if (!error && data) setMembres(data);
   };
 
-  // 📸 Fonction pour uploader l'image dans Supabase Storage
   const uploaderPhoto = async (fichier: File) => {
     const extension = fichier.name.split('.').pop();
     const nomFichier = `${utilisateur.id}_${Date.now()}.${extension}`;
@@ -65,7 +66,6 @@ export default function Membres() {
       return null;
     }
     
-    // Récupérer l'URL publique de l'image
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(nomFichier);
     return publicUrl;
   };
@@ -76,7 +76,6 @@ export default function Membres() {
 
     let urlPhotoFinale = urlPhotoExistante;
 
-    // Si on a sélectionné une nouvelle photo, on l'upload d'abord
     if (fichierPhoto) {
       const urlUpload = await uploaderPhoto(fichierPhoto);
       if (urlUpload) urlPhotoFinale = urlUpload;
@@ -98,13 +97,12 @@ export default function Membres() {
       const { error } = await supabase.from("membres").update(donnees).eq("id", membreSelectionne.id);
       if (!error) {
         setModeEdition(false);
-        setMembreSelectionne(null);
+        fermerModal();
       }
     } else {
       const { error } = await supabase.from("membres").insert([donnees]);
     }
 
-    // Reset formulaire
     setNom(""); setTelephone(""); setDateNaissance(""); setDateBapteme(""); 
     setDateCommunion(""); setDateConfirmation(""); setNotes("");
     setFichierPhoto(null); setUrlPhotoExistante("");
@@ -116,8 +114,14 @@ export default function Membres() {
     if (confirm("Supprimer définitivement ce membre ?")) {
       await supabase.from("membres").delete().eq("id", id);
       chargerMembres(utilisateur.id);
-      setMembreSelectionne(null);
+      fermerModal();
     }
+  };
+
+  const fermerModal = () => {
+    setMembreSelectionne(null);
+    setAfficherCarteVIP(false);
+    setQrZoom(false);
   };
 
   const membresFiltrés = membres.filter(m => 
@@ -125,7 +129,6 @@ export default function Membres() {
     m.telephone.includes(recherche)
   );
 
-  // Fonction utilitaire pour générer les initiales (ex: "Jean Dupont" -> "JD")
   const getInitiales = (nomComplet: string) => {
     return nomComplet.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   };
@@ -152,14 +155,12 @@ export default function Membres() {
 
         <div className="grid lg:grid-cols-3 gap-10">
           
-          {/* FORMULAIRE D'AJOUT / ÉDITION */}
           <div className="bg-[#111] p-8 rounded-3xl border border-clair/10 shadow-2xl h-fit sticky top-32">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
               {modeEdition ? "✏️ Modifier le Dossier" : "➕ Nouveau Fidèle"}
             </h2>
             <form onSubmit={gererSoumission} className="space-y-4">
               
-              {/* NOUVEAU : CHAMP PHOTO */}
               <div className="bg-sombre border border-clair/10 rounded-xl p-4 flex items-center gap-4">
                 {urlPhotoExistante ? (
                    <img src={urlPhotoExistante} alt="Aperçu" className="w-12 h-12 rounded-full object-cover border border-or" />
@@ -214,7 +215,7 @@ export default function Membres() {
               </button>
               {modeEdition && (
                 <button type="button" onClick={() => {
-                  setModeEdition(false); setMembreSelectionne(null); 
+                  setModeEdition(false); fermerModal(); 
                   setNom(""); setTelephone(""); setNotes(""); setFichierPhoto(null); setUrlPhotoExistante("");
                   setDateNaissance(""); setDateBapteme(""); setDateCommunion(""); setDateConfirmation("");
                 }} className="w-full text-clair/40 text-sm mt-2 hover:text-white transition-colors">Annuler la modification</button>
@@ -222,7 +223,6 @@ export default function Membres() {
             </form>
           </div>
 
-          {/* LISTE DES CARTES */}
           <div className="lg:col-span-2 grid md:grid-cols-2 gap-6">
             {membresFiltrés.map((m) => (
               <div 
@@ -231,7 +231,6 @@ export default function Membres() {
                 className="bg-[#111] p-6 rounded-3xl border border-clair/5 hover:border-or/40 transition-all cursor-pointer group shadow-lg flex flex-col justify-between relative overflow-hidden"
               >
                 <div className="flex items-start gap-4 mb-4 z-10">
-                  {/* AFFICHAGE DE LA PHOTO OU DES INITIALES */}
                   {m.photo_url ? (
                     <img src={m.photo_url} alt={m.nom} className="w-14 h-14 rounded-full object-cover border-2 border-or/50 shadow-lg" />
                   ) : (
@@ -247,7 +246,6 @@ export default function Membres() {
                   <div className="opacity-30 group-hover:opacity-100 transition-opacity text-xl text-or">→</div>
                 </div>
                 
-                {/* BADGES SACREMENTS */}
                 <div className="flex flex-wrap gap-2 mt-auto z-10">
                   {m.date_bapteme && <span className="bg-blue-500/10 text-blue-400 text-[9px] px-2 py-1 rounded-md font-bold border border-blue-500/20">💧 Baptisé</span>}
                   {m.date_communion && <span className="bg-amber-700/10 text-amber-500 text-[9px] px-2 py-1 rounded-md font-bold border border-amber-700/20">🥖 Communié</span>}
@@ -261,90 +259,165 @@ export default function Membres() {
         </div>
       </div>
 
-      {/* MODAL : DOSSIER PASTORAL */}
+      {/* MODAL PRINCIPALE */}
       {membreSelectionne && (
-        <div className="fixed inset-0 bg-sombre/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
-          <div className="bg-[#111] w-full max-w-2xl rounded-[40px] border border-or/30 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+        <div className="fixed inset-0 bg-sombre/90 backdrop-blur-md z-40 flex items-center justify-center p-6">
+          <div className="bg-[#111] w-full max-w-3xl rounded-[40px] border border-or/30 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 relative">
             
-            <div className="flex flex-col md:flex-row">
-              {/* CÔTÉ GAUCHE : IDENTITÉ VISUELLE AVEC PHOTO & QR CODE */}
-              <div className="bg-or p-8 flex flex-col items-center justify-center text-sombre md:w-2/5 relative">
-                
-                {/* GRANDE PHOTO DE PROFIL */}
-                <div className="mb-6 relative">
-                  {membreSelectionne.photo_url ? (
-                    <img src={membreSelectionne.photo_url} alt={membreSelectionne.nom} className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-xl" />
-                  ) : (
-                    <div className="w-32 h-32 rounded-full bg-white/20 border-4 border-white flex items-center justify-center text-sombre font-black text-5xl shadow-xl">
-                      {getInitiales(membreSelectionne.nom)}
+            <button onClick={fermerModal} className="absolute top-6 right-6 text-clair/40 hover:text-white text-2xl font-bold z-50 transition-colors">×</button>
+
+            {afficherCarteVIP ? (
+              
+              // ============================================
+              // 🔥 VUE : CARTE VIP (LE PASS PREMIUM) 🔥
+              // ============================================
+              <div className="p-12 flex flex-col items-center justify-center min-h-[500px] relative">
+                <button onClick={() => setAfficherCarteVIP(false)} className="absolute top-8 left-8 text-clair/50 hover:text-or text-sm font-bold flex items-center gap-2 transition-colors">
+                  ← Retour au dossier
+                </button>
+
+                <h2 className="text-xl font-black text-white/40 uppercase tracking-[0.3em] mb-10">Digital Pass</h2>
+
+                {/* LA CARTE EN ELLE-MÊME */}
+                <div 
+                  onClick={() => setQrZoom(true)} // NOUVEAU : Clic pour zoomer
+                  className="w-full max-w-md aspect-[1.58/1] bg-gradient-to-br from-[#1a1a1a] via-[#0a0a0a] to-black rounded-3xl border border-or/40 shadow-[0_20px_60px_rgba(255,215,0,0.15)] relative overflow-hidden flex flex-col justify-between p-6 group hover:border-or hover:scale-105 cursor-pointer transition-all duration-300"
+                  title="Cliquez pour agrandir le code"
+                >
+                  
+                  <div className="absolute -top-32 -right-32 w-64 h-64 bg-or/10 rounded-full blur-3xl group-hover:bg-or/20 transition-all duration-500"></div>
+
+                  <div className="flex justify-between items-start z-10">
+                    <div className="font-black text-xl tracking-tighter text-white">CHURCH<span className="text-or">HUB</span></div>
+                    <div className="bg-or/10 text-or text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-or/30 backdrop-blur-sm">VIP Member</div>
+                  </div>
+
+                  <div className="flex justify-between items-end z-10">
+                    <div className="flex flex-col gap-4">
+                      {membreSelectionne.photo_url ? (
+                        <img src={membreSelectionne.photo_url} alt={membreSelectionne.nom} className="w-16 h-16 rounded-full object-cover border-2 border-or shadow-[0_0_15px_rgba(255,215,0,0.3)]" />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-or/20 to-or/5 border-2 border-or/50 flex items-center justify-center text-or font-black text-2xl shadow-[0_0_15px_rgba(255,215,0,0.3)]">
+                          {getInitiales(membreSelectionne.nom)}
+                        </div>
+                      )}
+                      
+                      <div>
+                        <h3 className="text-2xl font-black text-white leading-none uppercase tracking-wide">{membreSelectionne.nom}</h3>
+                        <p className="text-or/70 font-mono text-[10px] mt-2 tracking-[0.2em] uppercase">ID • {String(membreSelectionne.id).padStart(8, '0').slice(0,8)}</p>
+                      </div>
                     </div>
-                  )}
+
+                    <div className="bg-white p-2 rounded-xl shadow-xl transform group-hover:scale-110 transition-transform duration-300 pointer-events-none">
+                      <QRCodeCanvas value={String(membreSelectionne.id)} size={75} bgColor="#ffffff" fgColor="#000000" level="H" />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="bg-white p-3 rounded-2xl shadow-xl mb-4">
-                  <QRCodeCanvas value={String(membreSelectionne.id)} size={90} bgColor="#ffffff" fgColor="#000000" level="H" />
-                </div>
-                <h4 className="text-[9px] font-black uppercase tracking-widest opacity-60">ID VIP</h4>
-                <p className="font-mono text-xs font-bold">{String(membreSelectionne.id).padStart(8, '0').slice(0,8)}</p>
+                <p className="text-clair/50 text-sm text-center mt-8 font-bold flex items-center gap-2">
+                  <span className="animate-pulse">👆</span> Touchez la carte pour agrandir le code
+                </p>
               </div>
 
-              {/* CÔTÉ DROIT : INFOS PASTORALES */}
-              <div className="p-8 flex-1 relative">
-                <button onClick={() => setMembreSelectionne(null)} className="absolute top-6 right-6 text-clair/20 hover:text-white text-2xl font-bold">×</button>
-                
-                <h2 className="text-3xl font-black text-white mb-1 leading-tight">{membreSelectionne.nom}</h2>
-                <p className="text-or font-bold mb-6">📞 {membreSelectionne.telephone}</p>
+            ) : (
 
-                <div className="grid grid-cols-2 gap-y-6 gap-x-4 mb-6">
-                  <div>
-                    <h5 className="text-[9px] uppercase font-black text-clair/30 mb-1 tracking-widest">Né(e) le</h5>
-                    <p className="text-white font-bold text-sm">{membreSelectionne.date_naissance ? new Date(membreSelectionne.date_naissance).toLocaleDateString('fr-FR') : "-"}</p>
+              // ============================================
+              // 📖 VUE : DOSSIER PASTORAL CLASSIQUE 📖
+              // ============================================
+              <div className="flex flex-col md:flex-row h-full">
+                <div className="bg-or p-8 flex flex-col items-center justify-center text-sombre md:w-2/5 relative">
+                  <div className="mb-6 relative">
+                    {membreSelectionne.photo_url ? (
+                      <img src={membreSelectionne.photo_url} alt={membreSelectionne.nom} className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-xl" />
+                    ) : (
+                      <div className="w-32 h-32 rounded-full bg-white/20 border-4 border-white flex items-center justify-center text-sombre font-black text-5xl shadow-xl">
+                        {getInitiales(membreSelectionne.nom)}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <h5 className="text-[9px] uppercase font-black text-blue-400/50 mb-1 tracking-widest">💧 Baptisé(e) le</h5>
-                    <p className="text-blue-400 font-bold text-sm">{membreSelectionne.date_bapteme ? new Date(membreSelectionne.date_bapteme).toLocaleDateString('fr-FR') : "-"}</p>
-                  </div>
-                  <div>
-                    <h5 className="text-[9px] uppercase font-black text-amber-500/50 mb-1 tracking-widest">🥖 Communié(e) le</h5>
-                    <p className="text-amber-500 font-bold text-sm">{membreSelectionne.date_communion ? new Date(membreSelectionne.date_communion).toLocaleDateString('fr-FR') : "-"}</p>
-                  </div>
-                  <div>
-                    <h5 className="text-[9px] uppercase font-black text-red-400/50 mb-1 tracking-widest">🕊️ Confirmé(e) le</h5>
-                    <p className="text-red-400 font-bold text-sm">{membreSelectionne.date_confirmation ? new Date(membreSelectionne.date_confirmation).toLocaleDateString('fr-FR') : "-"}</p>
+
+                  <h2 className="text-2xl font-black text-sombre mb-1 leading-tight text-center">{membreSelectionne.nom}</h2>
+                  <p className="text-sombre/70 font-bold mb-6 font-mono text-sm">{membreSelectionne.telephone}</p>
+
+                  <div className="bg-white/20 px-4 py-2 rounded-xl font-mono text-xs font-bold border border-white/30">
+                    ID: {String(membreSelectionne.id).padStart(8, '0').slice(0,8)}
                   </div>
                 </div>
 
-                <div className="bg-sombre/50 p-5 rounded-2xl border border-clair/5">
-                  <h5 className="text-[10px] uppercase font-black text-or mb-2 tracking-widest">Journal de Suivi</h5>
-                  <p className="text-clair/70 text-sm leading-relaxed italic max-h-24 overflow-y-auto pr-2">
-                    {membreSelectionne.notes_pastorales || "Aucune note."}
-                  </p>
-                </div>
+                <div className="p-8 flex-1 flex flex-col">
+                  
+                  <h3 className="text-xl font-black text-white mb-6 border-b border-clair/10 pb-4">Parcours Spirituel</h3>
 
-                <div className="mt-6 flex gap-4">
-                  <button 
-                    onClick={() => {
-                      setNom(membreSelectionne.nom);
-                      setTelephone(membreSelectionne.telephone);
-                      setDateNaissance(membreSelectionne.date_naissance || "");
-                      setDateBapteme(membreSelectionne.date_bapteme || "");
-                      setDateCommunion(membreSelectionne.date_communion || "");
-                      setDateConfirmation(membreSelectionne.date_confirmation || "");
-                      setNotes(membreSelectionne.notes_pastorales || "");
-                      setUrlPhotoExistante(membreSelectionne.photo_url || "");
-                      setModeEdition(true);
-                      setMembreSelectionne(null);
-                    }}
-                    className="flex-1 bg-white/5 border border-white/10 text-white font-bold py-3 rounded-xl hover:bg-white/10 transition-all text-sm"
-                  >
-                    ✏️ Modifier
-                  </button>
-                  <button onClick={() => supprimerMembre(membreSelectionne.id)} className="bg-red-500/10 text-red-500 px-6 rounded-xl hover:bg-red-500 hover:text-white transition-all">🗑️</button>
+                  <div className="grid grid-cols-2 gap-y-6 gap-x-4 mb-6">
+                    <div>
+                      <h5 className="text-[9px] uppercase font-black text-clair/30 mb-1 tracking-widest">Né(e) le</h5>
+                      <p className="text-white font-bold text-sm">{membreSelectionne.date_naissance ? new Date(membreSelectionne.date_naissance).toLocaleDateString('fr-FR') : "-"}</p>
+                    </div>
+                    <div>
+                      <h5 className="text-[9px] uppercase font-black text-blue-400/50 mb-1 tracking-widest">💧 Baptisé(e) le</h5>
+                      <p className="text-blue-400 font-bold text-sm">{membreSelectionne.date_bapteme ? new Date(membreSelectionne.date_bapteme).toLocaleDateString('fr-FR') : "-"}</p>
+                    </div>
+                    <div>
+                      <h5 className="text-[9px] uppercase font-black text-amber-500/50 mb-1 tracking-widest">🥖 Communié(e) le</h5>
+                      <p className="text-amber-500 font-bold text-sm">{membreSelectionne.date_communion ? new Date(membreSelectionne.date_communion).toLocaleDateString('fr-FR') : "-"}</p>
+                    </div>
+                    <div>
+                      <h5 className="text-[9px] uppercase font-black text-red-400/50 mb-1 tracking-widest">🕊️ Confirmé(e) le</h5>
+                      <p className="text-red-400 font-bold text-sm">{membreSelectionne.date_confirmation ? new Date(membreSelectionne.date_confirmation).toLocaleDateString('fr-FR') : "-"}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-sombre/50 p-5 rounded-2xl border border-clair/5 flex-1">
+                    <h5 className="text-[10px] uppercase font-black text-or mb-2 tracking-widest">Journal de Suivi</h5>
+                    <p className="text-clair/70 text-sm leading-relaxed italic max-h-32 overflow-y-auto pr-2">
+                      {membreSelectionne.notes_pastorales || "Aucune note."}
+                    </p>
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <button 
+                      onClick={() => setAfficherCarteVIP(true)}
+                      className="bg-or/10 border border-or/30 text-or font-bold py-3 px-4 rounded-xl hover:bg-or hover:text-sombre transition-all text-sm flex items-center gap-2 flex-1 justify-center"
+                    >
+                      💳 Voir la Carte VIP
+                    </button>
+                    
+                    <button 
+                      onClick={() => {
+                        setNom(membreSelectionne.nom); setTelephone(membreSelectionne.telephone);
+                        setDateNaissance(membreSelectionne.date_naissance || ""); setDateBapteme(membreSelectionne.date_bapteme || "");
+                        setDateCommunion(membreSelectionne.date_communion || ""); setDateConfirmation(membreSelectionne.date_confirmation || "");
+                        setNotes(membreSelectionne.notes_pastorales || ""); setUrlPhotoExistante(membreSelectionne.photo_url || "");
+                        setModeEdition(true); fermerModal();
+                      }}
+                      className="bg-white/5 border border-white/10 text-white font-bold py-3 px-4 rounded-xl hover:bg-white/10 transition-all text-sm" title="Modifier le dossier"
+                    >
+                      ✏️
+                    </button>
+                    
+                    <button onClick={() => supprimerMembre(membreSelectionne.id)} className="bg-red-500/10 text-red-500 px-4 rounded-xl hover:bg-red-500 hover:text-white transition-all" title="Supprimer">
+                      🗑️
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
+            )}
           </div>
+        </div>
+      )}
+
+      {/* OVERLAY PLEIN ÉCRAN POUR LE SCAN DU QR CODE */}
+      {qrZoom && membreSelectionne && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center cursor-pointer animate-in fade-in duration-200"
+          onClick={() => setQrZoom(false)}
+        >
+          <div className="bg-white p-8 rounded-[40px] shadow-[0_0_100px_rgba(255,215,0,0.3)] animate-in zoom-in duration-300">
+            <QRCodeCanvas value={String(membreSelectionne.id)} size={280} bgColor="#ffffff" fgColor="#000000" level="H" />
+          </div>
+          <h3 className="text-white text-3xl font-black mt-10 tracking-widest uppercase">{membreSelectionne.nom}</h3>
+          <p className="text-or/50 mt-4 font-bold tracking-[0.2em] uppercase text-sm animate-pulse">Toucher l'écran pour fermer</p>
         </div>
       )}
     </div>
