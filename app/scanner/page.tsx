@@ -234,6 +234,38 @@ export default function ScannerEntree() {
               #lecteur-qr button:hover { transform: scale(1.02); box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5); }
               #lecteur-qr span { color: #fff !important; }
               #lecteur-qr select { background: #1a1a1a !important; color: #fff !important; border: 1px solid #333 !important; border-radius: 12px; padding: 12px; margin-bottom: 10px; width: 100%; font-weight: bold;}
+              
+              /* =========================================
+                 TRADUCTION FORCÉE (ANGLAIS -> FRANÇAIS)
+                 ========================================= */
+                 
+              /* 1. On masque le texte original en anglais (taille 0) */
+              #html5-qrcode-button-camera-permission,
+              #html5-qrcode-button-camera-start,
+              #html5-qrcode-button-camera-stop {
+                font-size: 0 !important; 
+              }
+              
+              /* 2. On injecte nos textes en français ! */
+              #html5-qrcode-button-camera-permission::after {
+                content: "📸 AUTORISER LA CAMÉRA";
+                font-size: 14px !important;
+              }
+              
+              #html5-qrcode-button-camera-start::after {
+                content: "▶️ DÉMARRER LE SCANNER";
+                font-size: 14px !important;
+              }
+              
+              #html5-qrcode-button-camera-stop::after {
+                content: "⏹️ ARRÊTER LA CAMÉRA";
+                font-size: 14px !important;
+              }
+
+              /* 3. On supprime le lien inutile "Scan an Image File" */
+              #html5-qrcode-anchor-scan-type-change {
+                display: none !important;
+              }
             `}</style>
           </div>
 
