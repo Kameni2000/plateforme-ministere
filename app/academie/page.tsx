@@ -234,8 +234,7 @@ export default function Academie() {
                                 <div className="flex gap-2 shrink-0">
                                   {!estTermine && (
                                     <button 
-                                      onClick={() => setModalExamen({ inscriptionId: inscription.id, nom: inscription.membres.nom, etapesValidees: inscription.etapes_validees, total: formation.etapes_totales })}
-                                      className="bg-blue-500/10 hover:bg-blue-500 hover:text-white text-blue-400 px-4 py-2 rounded-xl text-xs font-bold border border-blue-500/20 transition-all"
+onClick={() => setModalExamen({ isOpen: true, inscriptionId: inscription.id, nom: inscription.membres.nom, etapesValidees: inscription.etapes_validees, total: formation.etapes_totales })}                                      className="bg-blue-500/10 hover:bg-blue-500 hover:text-white text-blue-400 px-4 py-2 rounded-xl text-xs font-bold border border-blue-500/20 transition-all"
                                     >
                                       📝 Évaluer
                                     </button>
